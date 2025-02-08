@@ -1,4 +1,4 @@
-#### pool_party_rs
+### pool_party_rs
 
 This tool is a remote process injection uses techniques described in https://www.safebreach.com/blog/process-injection-using-windows-thread-pools/ and found in https://github.com/SafeBreach-Labs/PoolParty . So far only the first variant is implemented. I will add more variants in the future.
 
