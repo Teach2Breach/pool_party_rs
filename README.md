@@ -1,6 +1,6 @@
 ### pool_party_rs
 
-This tool is a remote process injection uses techniques described in https://www.safebreach.com/blog/process-injection-using-windows-thread-pools/ and found in https://github.com/SafeBreach-Labs/PoolParty . So far only the first variant is implemented. I will add more variants in the future.
+This tool is a remote process injection uses techniques described in https://www.safebreach.com/blog/process-injection-using-windows-thread-pools/ and found in https://github.com/SafeBreach-Labs/PoolParty . So far only the first and second variant are implemented. I will add more variants in the future.
 
 ##### Note
 
@@ -8,7 +8,7 @@ This version does not use dynamic resolution of APIs or other OPSEC safe conside
 
 #### How it works
 
-This program implements a process injection technique using Windows Thread Pools, specifically targeting worker factories. Here's how it works:
+The 1st variant implements a process injection technique using Windows Thread Pools, specifically targeting worker factories. Here's how it works:
 
 The program takes shellcode and a target process ID as input, then performs several key steps:
 - First, it obtains a handle to the target process using OpenProcess with permissions for memory operations and handle manipulation.
@@ -31,6 +31,8 @@ The key Windows APIs and NT APIs used are:
 
 This technique is particularly interesting because it abuses legitimate Windows thread pool functionality to execute arbitrary code, making it potentially harder to detect than traditional injection methods.
 
+The 2nd variant tampers with the thread pool task queue to inject a malicious task into the queue. You can read more about it in the blog post.
+
 ##### Usage
  Add this to your cargo.toml
 
@@ -46,10 +48,19 @@ see main.rs for a full example
 ```
 use pool_party_rs::wrapper;
 
-wrapper(&SHELL_CODE, pid);
+let info_string = wrapper(&SHELL_CODE, pid, variant);
+println!("{}", info_string);
 ```
 
-Video of creating this PoC:
+##### PoC Usage 
+
+If you want to test the PoC in main.rs, you can use the following command:
+
+```
+cargo run <pid> <variant>
+```
+
+Video of creating the 1st variant PoC:
 
 [watch on X](https://x.com/Teach2Breach/status/1888336755067150736)
 

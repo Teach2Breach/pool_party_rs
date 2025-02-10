@@ -5,7 +5,7 @@ edition = "2021"
 # author: @teach2breach
 
 [dependencies]
-winapi = { version = "0.3", features = ["processthreadsapi", "memoryapi", "handleapi"] }
+winapi = { version = "0.3", features = ["processthreadsapi", "memoryapi", "handleapi", "threadpoolapiset"] }
 ntapi = "0.4.1"
 
 [profile.release]
