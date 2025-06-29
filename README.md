@@ -1,6 +1,6 @@
 ### pool_party_rs
 
-This tool is a remote process injection uses techniques described in https://www.safebreach.com/blog/process-injection-using-windows-thread-pools/ and found in https://github.com/SafeBreach-Labs/PoolParty . So far only the first and second variant are implemented. I will add more variants in the future.
+This tool is a remote process injection uses techniques described in https://www.safebreach.com/blog/process-injection-using-windows-thread-pools/ and found in https://github.com/SafeBreach-Labs/PoolParty . So far variants 1 and 2 are implemented. I will add more variants in the future.
 
 ##### Note
 
@@ -33,6 +33,49 @@ This technique is particularly interesting because it abuses legitimate Windows 
 
 The 2nd variant tampers with the thread pool task queue to inject a malicious task into the queue. You can read more about it in the blog post.
 
+#### Important: Target Process Requirements
+
+**The target process MUST be using thread pools for injection to work.** This means:
+
+- The process must have called `CreateThreadpoolWork`, `CreateThreadpoolTimer`, or similar thread pool APIs
+- Simple processes like notepad.exe, calc.exe, etc. typically don't use thread pools by default
+- Processes that use thread pools include: explorer.exe, modern browsers, development tools, etc.
+
+If you get "Failed to find worker factory handle" errors, the target process is not using thread pools.
+
+#### Testing and Debugging
+
+The tool includes enhanced debugging and testing capabilities:
+
+**Debug Output:**
+- Shows all handle types found in the target process
+- Displays the number of handles and specific handle types
+- Provides clear error messages when injection fails
+
+**Test Process Creation:**
+- Use variant `0` to create a test process that uses thread pools
+- Automatically compiles and runs a C program that creates thread pool work items
+- Provides the PID for easy testing
+
+**Example Testing Workflow:**
+```bash
+# 1. Create a test process that uses thread pools
+cargo run 0 0
+
+# 2. Inject into the test process (use the PID from step 1)
+cargo run <test_pid> 1
+```
+
+**Troubleshooting Common Issues:**
+
+1. **"Failed to find worker factory handle"**
+   - The target process is not using thread pools
+   - Try targeting explorer.exe or use the test process (variant 0)
+
+2. **"Failed to open process"**
+   - Insufficient permissions (try running as Administrator)
+   - Process doesn't exist or has terminated
+
 ##### Usage
  Add this to your cargo.toml
 
@@ -50,14 +93,6 @@ use pool_party_rs::wrapper;
 
 let info_string = wrapper(&SHELL_CODE, pid, variant);
 println!("{}", info_string);
-```
-
-##### PoC Usage 
-
-If you want to test the PoC in main.rs, you can use the following command:
-
-```
-cargo run <pid> <variant>
 ```
 
 Video of creating the 1st variant PoC:

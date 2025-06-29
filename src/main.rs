@@ -29,6 +29,14 @@ fn main() {
     if args.len() != 3 {
         println!("Error: Missing arguments");
         println!("Usage: {} <target_pid> <variant_number>", args[0]);
+        println!("Available variants:");
+        println!("  0: Create test process (uses thread pools)");
+        println!("  1: Worker Factory StartRoutine overwrite");
+        println!("  2: Task Queue manipulation");
+        println!();
+        println!("Example workflow:");
+        println!("  1. Run: {} 0 0 (creates test process)", args[0]);
+        println!("  2. Run: {} <test_pid> 1 (injects into test process)", args[0]);
         std::process::exit(1);
     }
 
@@ -43,7 +51,7 @@ fn main() {
     let variant = match args[2].parse::<u32>() {
         Ok(variant) => variant,
         Err(_) => {
-            println!("Error: Invalid variant number. Please provide a valid number.");
+            println!("Error: Invalid variant number. Please provide a valid number (0, 1, or 2).");
             std::process::exit(1);
         }
     };

